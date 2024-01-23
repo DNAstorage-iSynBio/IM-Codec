@@ -7,15 +7,16 @@ Created on Tue May 25 11:17:33 2021
 
 from PIL import Image 
 import time, os
+from md5hash import scan
 
 nt_dic = {"0": "A", "1": "C", "2": "G", "3": "T"}
 met_tag = "Z"
 
 def siJinZhi(x:int) -> str:
 	'''
-	description: 十进制数转为四进制，并根据对应关系转换为碱基序列
-	param x: 十进制数
-	return: 对应四进制数的碱基序列
+	description: Decimal numbers are converted to quad and converted to base sequences according to correspondence.
+	param x: Decimal number
+	return: base_sequence
 	'''
 	
 	sijinzhi_list = []
@@ -28,100 +29,16 @@ def siJinZhi(x:int) -> str:
 	nt_seq = "".join(reversed(sijinzhi_list))
 	return nt_seq
 
-def trans_bin(string: str):
-	'''
-	description: 明文字符串转为01比特字符串
 
-	param string: 明文字符串
-	return: 01比特字符串
-	'''
-	bin_string = ""
-	for _str in string:
-		str_by = bytes(_str, encoding = "utf-8")
-		# print(str_by)
-		for str_b in str_by:
-			str_bin = bin(str_b)
-			# print(str_bin)
-			str_bin_s = str(str_bin)[2:]
-			str_bin_s = "0"*(8 - len(str_bin_s)) + str_bin_s
-			bin_string += str_bin_s
-	# print(len(bin_string))
-	return bin_string
 
-def transImageColor(image_path, image_type):
-	'''
-	description: 输入彩色图片，指定存储的类型【彩色，灰度，二值灰度】，程序中自动转换
-	'''
-
-	def intToBin(num):
-		str_bin = bin(num)[2:]
-		str_bin = "0"*(8-len(str_bin)) + str_bin
-		return str_bin
-
-	im=Image.open(image_path)
-	width, height=im.size
-
-	binary_str = ""
-	for i in range(height):
-		for j in range(width):
-			color=im.getpixel((j,i))
-			if image_type == "color":
-				color_r, color_g, color_b = intToBin(color[0]), intToBin(color[1]), intToBin(color[2])
-				binary_str += (color_r + color_g + color_b)
-			elif image_type == "gray":
-				color = int((color[0] + color[1] + color[2])/3)
-				color = intToBin(color)
-				binary_str += color
-			elif image_type == "black_white":
-				color = int((color[0] + color[1] + color[2])/3)
-				if color < 128:
-					binary_str += "0"
-				else:
-					binary_str += "1"
-
-		# 添加换行符的二进制码
-		binary_str += "00001010"
-
-	return binary_str
-
-def transImage(image_path, out_path):
-	'''
-	description: 将图片转换为二进制01字符串，仅黑白两色，一个像素点用一个0或1表示，其中0代表白色点，1代表黑色点
-
-	param impage_path: 输入图片的路径
-	param out_path: 可选参数，转为01字符串的结果保存为文本文件
-
-	return binary_str: 二进制01字符串结果
-	return (width, height): 图片的宽、高信息
-	'''
-
-	im=Image.open(image_path)
-	width, height=im.size
-
-	f = open(out_path, "w")
-	binary_str = ""
-	for i in range(height):
-		for j in range(width):
-			color=im.getpixel((j,i))
-			colorsum=color[0]+color[1]+color[2]
-			if colorsum < 256:
-				binary_str += "0"
-				f.write("0")
-			else:
-				binary_str += "1"
-				f.write("1")
-		f.write("\n")
-	f.close()
-
-	return binary_str, (width, height)
 
 def transNtSeq(binary_str: str, coding_nt_num: int =4) -> str:
 	'''
-	description: 将二进制01字符串转换为碱基序列，对应关系为bin_nt_dic
+	description: trasform binary tring into base sequence, mapping relationship: bin_nt_dic
 
-	param binary_str: 二进制01字符串
+	param binary_str: binary string
 
-	return nt_seq: 碱基序列
+	return nt_seq: base sequence
 	'''
 	if coding_nt_num == 4:
 		bin_nt_dic = {"11":"A", "10":"T", "01":"C", "00":"G"}
@@ -132,7 +49,15 @@ def transNtSeq(binary_str: str, coding_nt_num: int =4) -> str:
 	elif coding_nt_num == 3:
 		bin_nt_dic = {"000":"AA", "001":"AT", "010":"AC", "011":"TT", "100":"TA", "101":"TC", "110":"CC", "111":"CA"}
 		unit_len = 3
-
+	elif coding_nt_num == 8:
+		bin_nt_dic = {"000":"A", "001":"B", "010":"C", "011":"D", "100":"E", "101":"F", "110":"G", "111":"H"}
+		unit_len = 3
+	elif coding_nt_num == 16:
+		bin_nt_dic = {"0000": "A", "0001": "B", "0010": "C", "0011": "D", "0100": "E", "0101": "F", "0110": "G",
+					  "0111": "H", "1000": "I", "1001": "J", "1010": "K", "1011": "L", "1100": "M", "1101": "N",
+					  "1110": "O", "1111": "P"}
+		unit_len = 4
+		
 	n = 0
 	nt_seq = ""
 	while True:
@@ -152,11 +77,11 @@ def transNtSeq(binary_str: str, coding_nt_num: int =4) -> str:
 
 def suffixTree(string: str) -> list:
 	'''
-	description: 使用后缀树找出字符串中连续重复的子串（STR）
+	description: find the tandem repeat sub-sequence
 
-	param string: 字符串，此处为碱基序列
+	param string: base sequence
 
-	return repeat_list: [[repeat_unit, start, end, length, repeat_count, unit_len], ...]，重复子字符串的相关信息，end为末尾pos+1，对应list取区间规则
+	return repeat_list: [[repeat_unit, start, end, length, repeat_count, unit_len], ...]，information of tandem repeat sub-sequence, end = last_pos+1
 	'''
 
 	repeat_list = []
@@ -165,7 +90,7 @@ def suffixTree(string: str) -> list:
 		for pos2 in range(pos1 + 1, len(string)):
 			step_len = int(pos2 - pos1)
 
-			#到达序列末尾，无法取到足够步长的序列，终止此层循环
+			# Arriving at the end of a sequence, it is impossible to take a sequence with sufficient step length, terminate this layer loop
 			if len(string[pos2: pos2 + step_len]) < step_len:
 				break
 
@@ -185,7 +110,10 @@ def suffixTree(string: str) -> list:
 				# 	# print(_repeat_list)
 				# 	continue
 
-				#新找到的连续重复子串区间与现有最后一个子串区间重复时，若其长度大于上一个子串，则对上一子串进行替换
+				'''
+				When the newly found continuous repeat substring interval repeats with the existing last substring interval, 
+				if its length is greater than the previous substring, replace the previous substring
+				'''
 				if repeat_list != [] and (repeat_list[-1][1] <= _repeat_list[1] < repeat_list[-1][2]):
 					if (_repeat_list[3] > repeat_list[-1][3]):
 						repeat_list[-1] = _repeat_list
@@ -194,60 +122,43 @@ def suffixTree(string: str) -> list:
 
 	return repeat_list
 
+def suffixTreeEcryption(string: str) -> list:
+	# record the single base repeat unit
 
-def compressSeq(nt_seq: str):
-	'''
-	description: 识别序列中单一碱基的串联重复，并进行压缩
+	# add marker at the end 
+	string += "?"
+	s = 0
+	repeat_list = []
 
-	param nt_seq: 碱基序列
+	while True:
+		n = 1
+		if s == len(string)-1:
+			break
 
-	return comp_seq[1:]: 压缩后的序列
-	return count_list[1:]: 序列中，碱基对应的计数信息
-	'''
+		while True:
+			base_s, base_e = string[s], string[s+n]
+			if base_e != base_s:
+				_repeat_list = [base_s, s, s+n, n, n, 1]
+				repeat_list.append(_repeat_list)
+				break
+			else:
+				n+= 1
 
-	comp_seq, count_list = "0", []
-	n = 1
+		s += n
 
-	for i in nt_seq:
-		if i != comp_seq[-1]:
-			count_list.append(n)
-			comp_seq += i
-			n = 1
-		else:
-			n += 1
-	count_list.append(n)
-
-	return comp_seq[1:], count_list[1:]
+	return repeat_list
 
 
-def outPutSeq(comp_seq, count_list):
-	decode_seq_list, info_seq = [], ""
-	set_len = 0
-	for i in range(len(count_list)):
-		_count = count_list[i]
-		_nt = comp_seq[i]
 
-		if _count == 1:
-			info_seq += _nt
-		else:
-			_count_seq = siJinZhi(_count)
-			decode_seq_list.append(_count_seq)
-			if len(_count_seq) > set_len:
-				set_len = len(_count_seq)
 
-			info_seq += met_tag + _nt
 
-	decode_seq_list = [nt_dic["0"]*(set_len - len(i)) + i for i in decode_seq_list]
-	decode_seq = "".join(decode_seq_list)
-
-	return decode_seq, info_seq, 
 
 
 def bwt(nt_seq):
 	'''
-	description: BWT算法转换序列
-	params nt_seq: 碱基序列
-	return sort_list: 转换之后的矩阵
+	description: BWT algorithm tranform the base sequence
+	params nt_seq: base sequence
+	return sort_list: the matirx after tramsformation
 	'''
 	nt_seq += "$"
 	sort_list = [nt_seq]
@@ -284,19 +195,18 @@ def bwt(nt_seq):
 
 def filterRepeatList(repeat_list):
 	'''
-	description: 过滤后缀树算法找到的串联重复序列，去掉压缩后总序列长度大于等于压缩前序列长的部分
+	description: filter the tandem sequencesm. remove the sequence that the length after compression is bigger than original.
 
-	param repeat_list: 后缀树算法返回的串联重复序列的列表
+	param repeat_list: tandem repeat sequences list
 
-	return repeat_list: 过滤之后的串联重复序列的列表
-	return set_len: decode_seq中，以set_len长度为一个单元表示一组串联重复的重复个数
-	return max_unit_len: 最长的重复单元的位数
+	return repeat_list: tandem repeat sequences list after filter
+	return set_len: in decode_seq，the length of the number of unit repeating
+	return max_unit_len
 	'''
 
 	max_unit_len = max([i[5] for i in repeat_list])
 	set_len = len(siJinZhi(max([i[4] for i in repeat_list])))
 
-	# 连续两次过滤后的repeat_list相等时，跳出循环，返回参数
 	while True:
 		# print(max_unit_len, set_len, repeat_list,'\n') #bkp
 		repeat_list_new = []
@@ -314,45 +224,20 @@ def filterRepeatList(repeat_list):
 	return repeat_list, set_len, max_unit_len
 
 
-# def filterRepeatList(repeat_list):
+def encryptFilterList(repeat_list, run = 4):
+	# filter in encryption mode. choose the single base repeating sub-sequence
+	# run: homopolymer can be set, default value=4 
 
-# 	[i.append(len(siJinZhi(i[4]))) for i in repeat_list]
+	repeat_list_new = []
+	for _repeat_list in repeat_list:
+		if _repeat_list[-1] == 1:
+			if _repeat_list[4] > run:
+				repeat_list_new.append(_repeat_list)
 
+	max_unit_len = 1
+	set_len = len(siJinZhi(max([i[4] for i in repeat_list_new])))
 
-# 	set_len_list = list(set([i[6] for i in repeat_list]))
-# 	set_len_list.sort(reverse = True)
-# 	decrease_nt_num_list = []
-# 	for set_len in set_len_list:
-# 		decrease_nt_num = 0
-# 		for _repeat_list in repeat_list:
-# 			repeat_count, unit_len, _set_len = _repeat_list[4], _repeat_list[5], _repeat_list[6]
-# 			if _set_len > set_len:
-# 				continue
-# 			_devrease_nt_num = ((repeat_count-2)*unit_len- set_len)
-# 			if _devrease_nt_num < 0:
-# 				continue
-# 			decrease_nt_num += _devrease_nt_num
-# 		decrease_nt_num_list.append(decrease_nt_num)
-# 	max_index = decrease_nt_num_list.index(max(decrease_nt_num_list))
-# 	set_len = set_len_list[max_index]
-
-# 	repeat_list_new = []
-# 	for _repeat_list in repeat_list:
-# 		repeat_count, unit_len, _set_len = _repeat_list[4], _repeat_list[5], _repeat_list[6]
-# 		if _set_len > set_len:
-# 			continue
-
-# 		_devrease_nt_num = ((repeat_count-2)*unit_len- set_len)
-# 		if _devrease_nt_num < 0:
-# 			continue
-# 		repeat_list_new.append(_repeat_list)
-
-# 	max_unit_len = max([i[5] for i in repeat_list_new])
-
-# 	return repeat_list_new, set_len, max_unit_len
-
-
-
+	return repeat_list_new, set_len, max_unit_len
 
 
 def controlGC(nt_seq, win=50):
@@ -382,11 +267,12 @@ def controlGC(nt_seq, win=50):
 	return new_nt_seq
 
 
-def regularMain(nt_seq, coding_nt_num=4):
+
+	return repeat_list
+
+def regularMain(nt_seq, coding_nt_num=4, mode="c"):
 	
 
-	# binary_str, size_set = transImage(image_path, out_path)
-	# nt_seq = transNtSeq(binary_str)
 
 	#bwt
 	print("Start: the step of BWT")
@@ -396,25 +282,32 @@ def regularMain(nt_seq, coding_nt_num=4):
 	print("Done! Time: {0} min.\n".format((e - s)/60))
 	# trans_seq = None
 
-	#后缀树
 	print("Start: the step of suffix Tree")
 	s = time.time()
-	repeat_list_ori = suffixTree(trans_seq)
+
+	if mode == "c":
+		repeat_list_ori = suffixTree(trans_seq)
+	elif mode == "e":
+		repeat_list_ori = suffixTreeEcryption(trans_seq)
+
 	e = time.time()
 	print("Done! Time: {0} min.\n".format((e - s)/60))
 
-	#过滤无法有压缩效果的串联重复序列（压缩后的序列总长大于等于压缩前的序列）
 	print("Start: the step of filter repeat list")
 	s = time.time()
-	repeat_list, set_len, max_unit_len = filterRepeatList(repeat_list_ori)
+
+	if mode == "c":
+		repeat_list, set_len, max_unit_len = filterRepeatList(repeat_list_ori)
+	elif mode == "e":
+		repeat_list, set_len, max_unit_len = encryptFilterList(repeat_list_ori)
 	e = time.time()
+
 	print("Done! Time: {0} min.\n".format((e - s)/60))
 
 	decode_seq_list, info_seq = [], ""
 	# set_len = 0
 	# max_unit_len = 0
 
-	## 得到编码序列和信息序列
 	break_point_index = 0
 	for _repeat_list in repeat_list:
 		repeat_unit, start, end, length, repeat_count, unit_len = _repeat_list[:6]
@@ -430,12 +323,11 @@ def regularMain(nt_seq, coding_nt_num=4):
 		break_point_index = end
 	info_seq += trans_seq[end:]
 
-	# 编码序列
 	print("The length of decode-sequence-unit is: {0}. ".format(set_len))
 	decode_seq_list = [nt_dic["0"]*(set_len - len(i)) + i for i in decode_seq_list]
 	decode_seq = "".join(decode_seq_list)
 
-	#替换$符号为(set_len+1)个甲基化碱基
+	# change the "$" to (set_len+1)*met_tag
 	tag_index = info_seq.index("$")
 	info_seq = info_seq[:tag_index] + met_tag*(max_unit_len + 1) + info_seq[tag_index + 1:]
 	if coding_nt_num==2:
@@ -443,24 +335,12 @@ def regularMain(nt_seq, coding_nt_num=4):
 	elif coding_nt_num==3:
 		info_seq = info_seq.replace(met_tag, "G")
 
-	#压缩效率
+	# compressibililty
 	compressibility = round((len(decode_seq) + len(info_seq))/len(nt_seq)*100, 2)
 
 	print("The compressibility is: {0}%.".format(compressibility))
 	return decode_seq, info_seq, nt_seq, trans_seq, repeat_list, sort_seq_matrix, repeat_list_ori
 
-def singleBaseCompressMain(nt_seq):
-	'''
-	description: 压缩序列中一个碱基为单元的串联重复
-	param nt_seq: 碱基序列
-	return:
-	'''
-
-	comp_seq, count_list = compressSeq(nt_seq)
-	decode_seq, info_seq = outPutSeq(comp_seq, count_list)
-	compressibility = round((len(decode_seq) + len(info_seq))/len(nt_seq)*100, 2)
-	print("The compressibility is: {0}%.".format(compressibility))
-	return decode_seq, info_seq
 
 def transBin(input_path):
 	binary_str = ""
@@ -478,7 +358,9 @@ def readFile(input_path:str) -> str:
 
 	return file_str
 
+
 def saveResult(out_path, decode_seq, info_seq):
+	out_path += "_{}.seq".format(mode)
 	decode_path = out_path + ".key"
 	with open(out_path, "w") as f:
 		f.write(info_seq+"\n")
@@ -486,65 +368,70 @@ def saveResult(out_path, decode_seq, info_seq):
 	with open(decode_path, "w") as f:
 		f.write(decode_seq+"\n")
 
-# def saveTmp(path, data):
-# 	f = open(path, "w")
-# 	f.write(data)
-# 	f.close()
-if __name__ == "__main__":
-	# # image_path = "D:/中科院先进院合成所/项目/2021_05_24-甲基化修饰DNA存储/测试数据/向日葵250318.jpg"
-	# # out_path = "D:/中科院先进院合成所/项目/2021_05_24-甲基化修饰DNA存储/output/太极.txt"
-	# # binary_str, size_set = transImage(image_path, out_path)
-	# # nt_seq = transNtSeq(binary_str)
-	# # decode_seq, info_seq = singleBaseCompressMain(nt_seq)
-
-
-	# # poetry = "Hello biology!"
-	# poetry = "Hello world!"
-	# # poetry = '''The cloud stood hunbly in a corner of the sky, the morning crowned it with splend our. '''
-	# # poetry = "Information density is a further consideration while assessing this technique. Figure files have the lowest information density for each approach."
-
-
-	# # input_path = "D:/中科院先进院合成所/项目/2021_05_24-甲基化修饰DNA存储/文字测试数据/input/背影-朱自清.txt"
-	# # with open(input_path, encoding = "utf-8") as f:
-	# # 	poetry = [i for i in f]
-	# # poetry = "".join(poetry)
+# remove_index_list 指的是移除第几个Z, 不是在序列中的index
+def artificialChoosePos(remove_index_list:list, info_seq:str, decode_seq: str):
 	
-	# binary_str = trans_bin(poetry)
+	reserve_seq, pos_seq, remove_seq = "", "", ""
 
-	# # input_path = "D:/中科院先进院合成所/项目/2021_05_24-甲基化修饰DNA存储/03_测试数据/加密相关测试数据/input/1.jpg"
-	# # input_path = "D:/中科院先进院合成所/项目/2021_05_24-甲基化修饰DNA存储/11_图片/test.txt"
-	# # input_path = "D:/中科院先进院合成所/项目/2021_05_24-甲基化修饰DNA存储/07_实验/input.txt"
-	# # input_path = "D:/中科院先进院合成所/项目/2021_05_24-甲基化修饰DNA存储/12_bitcoin/praviteKey.txt"
-	# # binary_str = transBin(input_path)
-	# # binary_str = transImageColor(image_path, "black_white")
-	# coding_nt_num=2
-	# nt_seq = transNtSeq(binary_str, coding_nt_num=coding_nt_num)
-	# decode_seq, info_seq, nt_seq, trans_seq, repeat_list, sort_seq_matrix, repeat_list_ori = regularMain(nt_seq, coding_nt_num=coding_nt_num)
-	# # saveResult(out_path, decode_seq, info_seq)
+	arti_info_seq = info_seq.replace(met_tag*2, "X")
+	tag_num = len(repeat_list)
+	unit_len = int(len(decode_seq)/tag_num)
 
-	###########################################################################################################################
-	###########################################################################################################################
+
+	pos_len = len(siJinZhi(len(arti_info_seq)))
+	for i in range(tag_num):
+		if i not in remove_index_list:
+			arti_info_seq = arti_info_seq.replace("Z", "Y", 1)
+			reserve_seq += decode_seq[unit_len*i: unit_len*(i+1)]
+		else:
+	
+			tag_index = arti_info_seq.index("Z")
+			arti_info_seq = arti_info_seq.replace("Z", "", 1)
+
+			_pos_seq = siJinZhi(tag_index)
+			_pos_seq = nt_dic["0"]*(pos_len-len(_pos_seq))+_pos_seq	
+			pos_seq += _pos_seq
+
+			remove_seq += decode_seq[unit_len*i: unit_len*(i+1)]
+
+	arti_decode_seq = "{}X{}Y{}".format(reserve_seq, pos_seq, remove_seq)
+
+	return arti_decode_seq, arti_info_seq
+
+
+
+
+
+
+if __name__ == "__main__":
+
 	import argparse
 	def linxCommand():
 		parser = argparse.ArgumentParser()
 		parser.add_argument("i", type=str, help = "input path")
 		parser.add_argument("o", type=str, help = "output path")
 		parser.add_argument("-n", "--coding_nt_num", type=int, default=4, help = "The number of coding bases used, default=[4]")
+		parser.add_argument("-m", "--mode", type=str, default="e", help="[e]ncryption, [c]ompression.")
 		parser.add_argument("-bin", "--binary", type=bool, default=False, help="The input file is binary string or not, default=[False]. Bool type.")
 		args = parser.parse_args()
-		return args.i, args.o, args.coding_nt_num, args.binary
+		return args.i, args.o, args.coding_nt_num, args.binary, args.mode
 
-	input_path, out_path, coding_nt_num, is_bin = linxCommand()
+	input_path, out_path, coding_nt_num, is_bin, mode = linxCommand()
 
 	if is_bin == False:
 		binary_str = transBin(input_path)
 	else:
 		binary_str = readFile(input_path)
 
-	# print(type(binary_str)) #bkp
+	
 	nt_seq = transNtSeq(binary_str, coding_nt_num=coding_nt_num)
-	decode_seq, info_seq, nt_seq, trans_seq, repeat_list, sort_seq_matrix, repeat_list_ori = regularMain(nt_seq)
+	decode_seq, info_seq, nt_seq, trans_seq, repeat_list, sort_seq_matrix, repeat_list_ori = regularMain(nt_seq, coding_nt_num=coding_nt_num, mode=mode)
 	saveResult(out_path, decode_seq, info_seq)
+
+	file_size = os.path.getsize(input_path)*8
+	print("{} density: {} bits/nt\n\n".format(os.path.basename(input_path), file_size/(len(info_seq)+len(decode_seq))))
+
+
 
 
 
